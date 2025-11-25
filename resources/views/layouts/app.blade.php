@@ -1,134 +1,158 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="id">
 <head>
     <meta charset="UTF-8">
+    <meta name="csrf-token" content="{{ csrf_token() }}">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dashboard - {{ config('app.name') }}</title>
+    <title>@yield('title', 'Dashboard') - {{ config('app.name') }}</title>
+
     <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <link rel="stylesheet"
+          href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
 </head>
-<body class="bg-gray-100 font-sans">
-    <div class="flex h-screen">
-        <!-- Sidebar -->
-        <div class="hidden md:flex md:flex-shrink-0">
-            <div class="flex flex-col w-64 bg-indigo-800 text-white">
-                <div class="flex items-center justify-center h-16 px-4 bg-indigo-900">
-                    <span class="text-xl font-semibold">{{ config('app.name') }}</span>
-                </div>
-                <div class="flex flex-col flex-grow px-4 py-4">
-                    <nav class="flex-1 space-y-2">
-                        <a href="{{ route('dashboard') }}" class="flex items-center px-4 py-2 text-sm font-medium rounded-md bg-indigo-900 text-white">
-                            <i class="fas fa-tachometer-alt mr-3"></i>
-                            Dashboard
-                        </a>
-                        <a href="#" class="flex items-center px-4 py-2 text-sm font-medium rounded-md text-indigo-200 hover:bg-indigo-700 hover:text-white">
-                            <i class="fas fa-user mr-3"></i>
-                            Profile
-                        </a>
-                        <a href="#" class="flex items-center px-4 py-2 text-sm font-medium rounded-md text-indigo-200 hover:bg-indigo-700 hover:text-white">
-                            <i class="fas fa-envelope mr-3"></i>
-                            Messages
-                        </a>
-                        <a href="#" class="flex items-center px-4 py-2 text-sm font-medium rounded-md text-indigo-200 hover:bg-indigo-700 hover:text-white">
-                            <i class="fas fa-cog mr-3"></i>
-                            Settings
-                        </a>
-                    </nav>
-                </div>
-                <div class="p-4 border-t border-indigo-700">
-                    <div class="flex items-center">
-                        <img class="w-10 h-10 rounded-full" src="{{ Auth::user()->avatar ?? 'https://ui-avatars.com/api/?name='.urlencode(Auth::user()->name).'&color=7F9CF5&background=EBF4FF' }}" alt="User avatar">
-                        <div class="ml-3">
-                            <p class="text-sm font-medium text-white">{{ Auth::user()->name }}</p>
-                            <a href="{{ route('logout') }}" onclick="event.preventDefault(); document.getElementById('logout-form').submit();" class="text-xs text-indigo-200 hover:text-white">
-                                Logout
-                            </a>
-                            <form id="logout-form" action="{{ route('logout') }}" method="POST" class="hidden">
-                                @csrf
-                            </form>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
+<body class="bg-gray-100 font-sans antialiased">
 
-        <!-- Main Content -->
-        <div class="flex flex-col flex-1 overflow-hidden">
-            <!-- Top Navigation -->
-            <div class="flex items-center justify-between h-16 px-4 bg-white border-b border-gray-200">
+    {{-- NAVBAR USER MERAH PUTIH --}}
+    <nav class="bg-red-600 text-white shadow-md">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between h-16">
+                {{-- Kiri: Logo + Nama App --}}
                 <div class="flex items-center">
-                    <button class="md:hidden text-gray-500 focus:outline-none">
-                        <i class="fas fa-bars"></i>
-                    </button>
-                    <h1 class="ml-4 text-lg font-semibold text-gray-800">@yield('title')</h1>
+                    <a href="{{ route('dashboard') }}" class="flex items-center">
+                        <img src="/logo.png" alt="Logo" class="h-8 w-8 rounded-full bg-white mr-2">
+                        <span class="font-semibold text-lg tracking-tight">
+                            {{ config('app.name') }}
+                        </span>
+                    </a>
                 </div>
-                <div class="flex items-center space-x-4">
-                    <button class="p-1 text-gray-500 rounded-full hover:text-gray-600 focus:outline-none">
-                        <i class="fas fa-bell"></i>
-                    </button>
-                    <div class="relative">
-                        <button class="flex items-center space-x-2 focus:outline-none">
-                            <span class="text-sm font-medium text-gray-700">{{ Auth::user()->name }}</span>
-                            <img class="w-8 h-8 rounded-full" src="{{ Auth::user()->avatar ?? 'https://ui-avatars.com/api/?name='.urlencode(Auth::user()->name).'&color=7F9CF5&background=EBF4FF' }}" alt="User avatar">
-                        </button>
-                    </div>
-                </div>
-            </div>
 
-            <!-- Content -->
-            <main class="flex-1 overflow-y-auto p-4">
-                @yield('content')
-            </main>
-        </div>
-    </div>
-
-    <!-- Mobile sidebar overlay -->
-    <div class="fixed inset-0 z-40 md:hidden hidden" id="mobile-sidebar">
-        <div class="fixed inset-0 bg-gray-600 bg-opacity-75"></div>
-        <div class="relative flex flex-col w-72 max-w-xs bg-indigo-800">
-            <!-- Mobile sidebar content -->
-            <div class="flex items-center justify-center h-16 px-4 bg-indigo-900">
-                <span class="text-xl font-semibold text-white">{{ config('app.name') }}</span>
-            </div>
-            <div class="flex-1 px-4 py-4 overflow-y-auto">
-                <nav class="space-y-2">
-                    <a href="{{ route('dashboard') }}" class="flex items-center px-4 py-2 text-sm font-medium rounded-md bg-indigo-900 text-white">
-                        <i class="fas fa-tachometer-alt mr-3"></i>
+                {{-- Menu Tengah (desktop) --}}
+                <div class="hidden md:flex items-center space-x-6 text-sm">
+                    <a href="{{ route('dashboard') }}"
+                       class="hover:text-red-100 {{ Request::routeIs('dashboard') ? 'font-semibold underline' : '' }}">
                         Dashboard
                     </a>
-                    <a href="#" class="flex items-center px-4 py-2 text-sm font-medium rounded-md text-indigo-200 hover:bg-indigo-700 hover:text-white">
-                        <i class="fas fa-user mr-3"></i>
-                        Profile
+
+                    <a href="{{ route('videos.index') }}"
+                       class="hover:text-red-100 {{ Request::routeIs('videos.*') ? 'font-semibold underline' : '' }}">
+                        Video YouTube
                     </a>
-                    <a href="#" class="flex items-center px-4 py-2 text-sm font-medium rounded-md text-indigo-200 hover:bg-indigo-700 hover:text-white">
-                        <i class="fas fa-envelope mr-3"></i>
-                        Messages
-                    </a>
-                    <a href="#" class="flex items-center px-4 py-2 text-sm font-medium rounded-md text-indigo-200 hover:bg-indigo-700 hover:text-white">
-                        <i class="fas fa-cog mr-3"></i>
-                        Settings
-                    </a>
-                </nav>
-            </div>
-            <div class="p-4 border-t border-indigo-700">
-                <div class="flex items-center">
-                    <img class="w-10 h-10 rounded-full" src="{{ Auth::user()->avatar ?? 'https://ui-avatars.com/api/?name='.urlencode(Auth::user()->name).'&color=7F9CF5&background=EBF4FF' }}" alt="User avatar">
-                    <div class="ml-3">
-                        <p class="text-sm font-medium text-white">{{ Auth::user()->name }}</p>
-                        <a href="{{ route('logout') }}" onclick="event.preventDefault(); document.getElementById('logout-form').submit();" class="text-xs text-indigo-200 hover:text-white">
-                            Logout
+
+                    @auth
+                        @if(Auth::user()->is_admin)
+                            <a href="{{ route('admin.dashboard') }}"
+                               class="hover:text-red-100 {{ Request::is('admin/*') ? 'font-semibold underline' : '' }}">
+                                Admin
+                            </a>
+                        @endif
+                    @endauth
+                </div>
+
+                {{-- Kanan: User/Login + Hamburger --}}
+                <div class="flex items-center space-x-3">
+                    @auth
+                        @php
+                            $name   = Auth::user()->name ?? 'User';
+                            $avatar = Auth::user()->avatar
+                                ?? 'https://ui-avatars.com/api/?name=' . urlencode($name) . '&color=DC2626&background=FEE2E2';
+                        @endphp
+
+                        <span class="hidden sm:inline text-sm">
+                            {{ $name }}
+                        </span>
+                        <img src="{{ $avatar }}" class="w-8 h-8 rounded-full border border-white" alt="Avatar">
+
+                        <form action="{{ route('logout') }}" method="POST" class="hidden sm:block">
+                            @csrf
+                            <button type="submit"
+                                    class="text-xs font-semibold bg-white text-red-600 px-3 py-1 rounded-full hover:bg-red-50">
+                                Logout
+                            </button>
+                        </form>
+                    @else
+                        <a href="{{ route('login') }}"
+                           class="text-xs font-semibold bg-white text-red-600 px-3 py-1 rounded-full hover:bg-red-50">
+                            Login
                         </a>
-                    </div>
+                    @endauth
+
+                    {{-- Tombol menu mobile --}}
+                    <button class="md:hidden focus:outline-none" onclick="toggleMobileMenu()">
+                        <i class="fas fa-bars text-xl"></i>
+                    </button>
                 </div>
             </div>
         </div>
-    </div>
+
+        {{-- MENU MOBILE --}}
+        <div id="mobile-menu" class="md:hidden hidden border-t border-red-500 bg-red-600">
+            <div class="px-4 py-3 space-y-2 text-sm">
+                <a href="{{ route('dashboard') }}"
+                   class="block py-1 {{ Request::routeIs('dashboard') ? 'font-semibold underline' : '' }}">
+                    Dashboard
+                </a>
+                <a href="{{ route('videos.index') }}"
+                   class="block py-1 {{ Request::routeIs('videos.*') ? 'font-semibold underline' : '' }}">
+                    Video YouTube
+                </a>
+
+                @auth
+                    @if(Auth::user()->is_admin)
+                        <a href="{{ route('admin.dashboard') }}"
+                           class="block py-1 {{ Request::is('admin/*') ? 'font-semibold underline' : '' }}">
+                            Admin
+                        </a>
+                    @endif
+
+                    <form action="{{ route('logout') }}" method="POST" class="pt-2">
+                        @csrf
+                        <button type="submit" class="w-full text-left py-1 font-semibold">
+                            Logout
+                        </button>
+                    </form>
+                @else
+                    <a href="{{ route('login') }}" class="block py-1 font-semibold">
+                        Login
+                    </a>
+                @endauth
+            </div>
+        </div>
+    </nav>
+
+    {{-- KONTEN UTAMA --}}
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+        {{-- Flash message --}}
+        @if(session('success'))
+            <div class="mb-4 bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded">
+                {{ session('success') }}
+            </div>
+        @endif
+        @if(session('error'))
+            <div class="mb-4 bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded">
+                {{ session('error') }}
+            </div>
+        @endif
+        @if(session('info'))
+            <div class="mb-4 bg-blue-100 border border-blue-400 text-blue-700 px-4 py-3 rounded">
+                {{ session('info') }}
+            </div>
+        @endif
+
+        @yield('content')
+    </main>
+
+    <footer class="border-t border-gray-200 py-4 mt-6 bg-white">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center text-xs text-gray-500">
+            &copy; {{ date('Y') }} {{ config('app.name') }} · Membantu kreator melawan komentar judi online.
+        </div>
+    </footer>
 
     <script>
-        // Mobile sidebar toggle
-        document.querySelector('[aria-controls="mobile-sidebar"]').addEventListener('click', function() {
-            document.getElementById('mobile-sidebar').classList.toggle('hidden');
-        });
+        function toggleMobileMenu() {
+            document.getElementById('mobile-menu').classList.toggle('hidden');
+        }
     </script>
+
+    @stack('scripts')
 </body>
 </html>
