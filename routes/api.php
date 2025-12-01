@@ -5,6 +5,8 @@ use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Admin\DatasetController;
 use App\Http\Controllers\Internal\ModelInternalController;
 use App\Http\Controllers\Internal\DatasetInternalController;
+use App\Http\Controllers\Admin\ModelLstmController;
+
 
 /*
 |--------------------------------------------------------------------------
@@ -35,3 +37,7 @@ Route::middleware('CheckInternalToken')->prefix('internal')->group(function () {
     Route::get('/dataset/{dataset}', [DatasetInternalController::class, 'show'])->name('internal.dataset.json');
     });
 });
+
+
+Route::post('/internal/train/callback', [ModelLstmController::class, 'internalTrainCallback'])
+    ->name('internal.train.callback');

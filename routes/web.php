@@ -63,17 +63,13 @@ Route::prefix('admin')->name('admin.')->middleware(['auth','admin'])->group(func
     Route::get('/dataset/{dataset}', [DatasetController::class, 'show'])
         ->name('dataset.show');
 
-    // IMPORT CSV to dataset
-    Route::post('/dataset/import/{dataset}', [DatasetController::class, 'importToDataset'])
+    Route::post('/dataset/import/{dataset}', [DatasetController::class, 'import'])
         ->name('dataset.import');
 
     // EXPORT dataset (CSV)
     Route::get('/dataset/export/{dataset}', [DatasetController::class, 'apiExportCsv'])
         ->name('dataset.export');
 
-    // preview small sample
-    Route::get('/dataset/preview/{dataset}', [DatasetController::class, 'preview'])
-        ->name('dataset.preview');
 
     // delete dataset
     Route::delete('/dataset/{dataset}', [DatasetController::class, 'destroy'])

@@ -1,88 +1,116 @@
 @extends('admin.layouts.app')
 
-@section('title','Model LSTM')
+@section('title', 'Model LSTM')
 
 @section('content')
-<div class="container mx-auto">
+<div class="max-w-5xl mx-auto space-y-4">
+
     @if(session('error'))
-        <div class="mb-4 p-3 bg-red-100 border border-red-300 text-red-800 rounded">
-            {{ session('error') }}
+        <div class="mb-2 flex items-center bg-red-50 border border-red-300 text-red-700 px-4 py-3 rounded-lg">
+            <i class="fas fa-exclamation-circle mr-2"></i>
+            <span>{{ session('error') }}</span>
         </div>
     @endif
+
     @if(session('success'))
-        <div class="mb-4 p-3 bg-green-100 border border-green-300 text-green-800 rounded">
-            {{ session('success') }}
+        <div class="mb-2 flex items-center bg-green-50 border border-green-300 text-green-700 px-4 py-3 rounded-lg">
+            <i class="fas fa-check-circle mr-2"></i>
+            <span>{{ session('success') }}</span>
         </div>
     @endif
 
-    <div class="bg-white p-4 rounded shadow">
-        <h3 class="font-semibold mb-4 text-lg">Model LSTM</h3>
+    <div class="bg-white px-5 py-4 rounded-xl shadow-sm border border-gray-100 space-y-4">
+        <h3 class="font-semibold text-lg text-gray-900 mb-2">Model LSTM</h3>
 
-        <p>Model path: <strong>{{ $modelFilePath ?? '-' }}</strong></p>
-        <p>Model exists: <strong>{{ $modelFilePath ? 'Yes' : 'No' }}</strong></p>
-        <p>Train script exists: <strong>{{ $trainFilePath ? 'Yes' : 'No' }}</strong></p>
+        {{-- Info file --}}
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm text-gray-700">
+            <div>
+                <p>Model path:</p>
+                <p class="font-mono text-xs bg-gray-50 border border-gray-100 rounded px-2 py-1 mt-1">
+                    {{ $modelFilePath ?? '-' }}
+                </p>
+            </div>
+            <div>
+                <p>Status file:</p>
+                <ul class="mt-1 text-xs space-y-1">
+                    <li>
+                        <span class="font-medium">Model:</span>
+                        {{ $modelFilePath ? 'Ada' : 'Tidak ada' }}
+                    </li>
+                    @if(!empty($modelModified))
+                        <li>
+                            <span class="font-medium">Model modified:</span>
+                            {{ date('Y-m-d H:i:s', (int) $modelModified) }}
+                        </li>
+                    @endif
+                    @if(!empty($trainModified))
+                        <li>
+                            <span class="font-medium">Train script modified:</span>
+                            {{ date('Y-m-d H:i:s', (int) $trainModified) }}
+                        </li>
+                    @endif
+                </ul>
+            </div>
+        </div>
 
-        @if(!empty($modelModified))
-            <p>Model modified: {{ date('Y-m-d H:i:s', (int)$modelModified) }}</p>
-        @endif
-        @if(!empty($trainModified))
-            <p>Train script modified: {{ date('Y-m-d H:i:s', (int)$trainModified) }}</p>
-        @endif
-
-        <hr class="my-4">
-
-        {{-- Upload model / script --}}
-        <form action="{{ route('admin.model.upload') }}" method="POST" enctype="multipart/form-data" class="mb-4">
-            @csrf
-            <label class="block mb-1 font-medium">Upload model / script (.h5 / .py / lain)</label>
-            <input type="file" name="model_file" accept="*" class="mb-2 border px-2 py-1 rounded w-full md:w-1/2">
-            <button class="px-4 py-2 bg-green-600 text-white rounded">Upload</button>
-        </form>
+        <hr class="my-3">
 
         {{-- Trigger training via FastAPI --}}
-        <form method="POST" action="{{ route('admin.model.triggerTrain') }}" class="mt-2 flex flex-wrap items-end gap-4">
-            @csrf
+        <div class="space-y-2">
+            <h4 class="font-semibold text-sm text-gray-800">Training via FastAPI</h4>
 
-            <div>
-                <label class="block text-sm font-medium mb-1">Dataset ID</label>
-                <input type="number" name="dataset_id" value="{{ old('dataset_id', 3) }}"
-                    class="border px-2 py-1 rounded w-24">
-            </div>
+            <form method="POST"
+                  action="{{ route('admin.model.triggerTrain') }}"
+                  class="flex flex-wrap items-end gap-4 text-sm">
+                @csrf
 
-            <div>
-                <label class="block text-sm font-medium mb-1">Epochs</label>
-                <input type="number" name="epochs" value="{{ old('epochs', 3) }}"
-                    class="border px-2 py-1 rounded w-24">
-            </div>
+                <div>
+                    <label class="block text-xs font-medium text-gray-700 mb-1">Dataset ID</label>
+                    <input type="number" name="dataset_id"
+                           value="{{ old('dataset_id', 3) }}"
+                           class="border border-gray-300 px-2 py-1.5 rounded w-24 focus:outline-none focus:ring-1 focus:ring-red-500">
+                </div>
 
-            <div>
-                <label class="block text-sm font-medium mb-1">Max words</label>
-                <input type="number" name="max_words" value="{{ old('max_words', 20000) }}"
-                    class="border px-2 py-1 rounded w-32">
-            </div>
+                <div>
+                    <label class="block text-xs font-medium text-gray-700 mb-1">Epochs</label>
+                    <input type="number" name="epochs"
+                           value="{{ old('epochs', 3) }}"
+                           class="border border-gray-300 px-2 py-1.5 rounded w-24 focus:outline-none focus:ring-1 focus:ring-red-500">
+                </div>
 
-            <div>
-                <label class="block text-sm font-medium mb-1">Maxlen</label>
-                <input type="number" name="maxlen" value="{{ old('maxlen', 200) }}"
-                    class="border px-2 py-1 rounded w-24">
-            </div>
+                <div>
+                    <label class="block text-xs font-medium text-gray-700 mb-1">Max words</label>
+                    <input type="number" name="max_words"
+                           value="{{ old('max_words', 20000) }}"
+                           class="border border-gray-300 px-2 py-1.5 rounded w-28 focus:outline-none focus:ring-1 focus:ring-red-500">
+                </div>
 
-            <div>
-                <label class="block text-sm font-medium mb-1">Model name prefix</label>
-                <input type="text" name="model_name_prefix" value="{{ old('model_name_prefix', 'admin_run') }}"
-                    class="border px-2 py-1 rounded w-32">
-            </div>
+                <div>
+                    <label class="block text-xs font-medium text-gray-700 mb-1">Maxlen</label>
+                    <input type="number" name="maxlen"
+                           value="{{ old('maxlen', 200) }}"
+                           class="border border-gray-300 px-2 py-1.5 rounded w-24 focus:outline-none focus:ring-1 focus:ring-red-500">
+                </div>
 
-            <div>
-                <button class="px-4 py-2 bg-yellow-500 text-white rounded">
-                    Train Model (FastAPI)
-                </button>
-            </div>
-        </form>
+                <div>
+                    <label class="block text-xs font-medium text-gray-700 mb-1">Model name prefix</label>
+                    <input type="text" name="model_name_prefix"
+                           value="{{ old('model_name_prefix', 'admin_run') }}"
+                           class="border border-gray-300 px-2 py-1.5 rounded w-32 focus:outline-none focus:ring-1 focus:ring-red-500">
+                </div>
+
+                <div>
+                    <button class="px-4 py-2 bg-yellow-500 text-white font-semibold rounded-lg hover:bg-yellow-600">
+                        Train Model
+                    </button>
+                </div>
+            </form>
+        </div>
 
         <div class="mt-4">
             <a href="{{ route('admin.model.download') }}"
-               class="px-4 py-2 bg-indigo-600 text-white rounded inline-block">
+               class="inline-flex items-center px-4 py-2 bg-red-600 text-white text-sm font-semibold rounded-lg hover:bg-red-700">
+                <i class="fas fa-download mr-2"></i>
                 Download latest model
             </a>
         </div>

@@ -11,26 +11,18 @@ use Laravel\Socialite\Facades\Socialite;
 class LoginController extends Controller
 {
     /**
-     * Where to redirect users after login.
-     *
-     * @var string
+     * Jangan pakai redirectTo statis lagi,
+     * kita ganti dengan fungsi redirectAfterLogin()
      */
-    protected $redirectTo = '/dashboard';
-    
-    /**
-     * Create a new controller instance.
-     *
-     * @return void
-     */
+    // protected $redirectTo = '/dashboard';
+
     public function __construct()
     {
         $this->middleware('guest')->except('logout');
     }
 
     /**
-     * Show the application's login form.
-     *
-     * @return \Illuminate\View\View
+     * Form login
      */
     public function showLoginForm()
     {
@@ -38,48 +30,44 @@ class LoginController extends Controller
     }
 
     /**
-     * Handle a login request to the application.
-     *
-     * @param  \Illuminate\Http\Request  $request
-     * @return \Illuminate\Http\RedirectResponse
+     * Login manual (email + password)
      */
     public function login(Request $request)
     {
         $request->validate([
-            'email' => 'required|email',
+            'email'    => 'required|email',
             'password' => 'required',
         ]);
 
         $credentials = $request->only('email', 'password');
-        $remember = $request->filled('remember');
+        $remember    = $request->filled('remember');
 
-        // Check if user exists with Google
+        // Cek apakah email ini memang khusus login Google
         $user = User::where('email', $request->email)->first();
-        
+
         if ($user && $user->google_id) {
             return back()
                 ->withInput($request->only('email', 'remember'))
                 ->withErrors([
-                    'email' => 'This email is registered with Google login. Please login using Google.',
+                    'email' => 'Email ini terdaftar dengan Google login. Silakan login menggunakan Google.',
                 ]);
         }
 
         if (Auth::attempt($credentials, $remember)) {
             $request->session()->regenerate();
-            return redirect()->intended($this->redirectTo);
+
+            return $this->redirectAfterLogin($request, Auth::user());
         }
 
         return back()
             ->withInput($request->only('email', 'remember'))
             ->withErrors([
-                'email' => 'These credentials do not match our records.',
+                'email' => 'Email atau password tidak sesuai.',
             ]);
     }
 
     /**
-     * Redirect to Google for authentication
-     *
-     * @return \Symfony\Component\HttpFoundation\RedirectResponse
+     * Redirect ke Google
      */
     public function redirectToGoogle()
     {
@@ -89,9 +77,7 @@ class LoginController extends Controller
     }
 
     /**
-     * Handle Google callback
-     *
-     * @return \Illuminate\Http\RedirectResponse
+     * Callback dari Google
      */
     public function handleGoogleCallback()
     {
@@ -103,37 +89,38 @@ class LoginController extends Controller
             $user = User::where('email', $googleUser->getEmail())->first();
 
             if ($user) {
-                // User exists - update Google ID if missing
+                // Kalau user sudah ada tapi belum punya google_id -> update
                 if (empty($user->google_id)) {
-                    $user->update(['google_id' => $googleUser->getId()]);
+                    $user->update([
+                        'google_id' => $googleUser->getId(),
+                    ]);
                 }
             } else {
-                // Create new user
+                // Buat user baru
                 $user = User::create([
-                    'name' => $googleUser->getName(),
-                    'email' => $googleUser->getEmail(),
-                    'google_id' => $googleUser->getId(),
-                    'password' => bcrypt(uniqid()), // Random password
-                    'email_verified_at' => now(), // Mark as verified
+                    'name'              => $googleUser->getName(),
+                    'email'             => $googleUser->getEmail(),
+                    'google_id'         => $googleUser->getId(),
+                    'password'          => bcrypt(uniqid()),
+                    'email_verified_at' => now(),
                 ]);
             }
 
             Auth::login($user, true);
 
-            return redirect()->intended($this->redirectTo);
+            // gunakan redirectAfterLogin supaya admin / user langsung tepat
+            return $this->redirectAfterLogin(request(), $user);
 
         } catch (\Exception $e) {
             \Log::error('Google login error: ' . $e->getMessage());
+
             return redirect('/login')
-                ->with('error', 'Failed to login with Google. Please try again.');
+                ->with('error', 'Gagal login dengan Google. Coba lagi.');
         }
     }
 
     /**
-     * Log the user out of the application.
-     *
-     * @param  \Illuminate\Http\Request  $request
-     * @return \Illuminate\Http\RedirectResponse
+     * Logout
      */
     public function logout(Request $request)
     {
@@ -143,5 +130,22 @@ class LoginController extends Controller
         $request->session()->regenerateToken();
 
         return redirect('/');
+    }
+
+    /**
+     * Fungsi pusat redirect setelah login (manual / Google)
+     * - Admin  -> /admin/dashboard
+     * - User   -> /dashboard (atau /videos, kalau mau)
+     */
+    protected function redirectAfterLogin(Request $request, User $user)
+    {
+        if ($user->is_admin) {
+            return redirect()->intended(route('admin.dashboard'));
+        }
+
+        // kalau mau user langsung ke video:
+        // return redirect()->intended(route('videos.index'));
+
+        return redirect()->intended(route('dashboard'));
     }
 }

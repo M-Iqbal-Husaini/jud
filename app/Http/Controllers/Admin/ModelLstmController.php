@@ -3,6 +3,8 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Models\ModelInfo;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Response;
@@ -16,7 +18,8 @@ class ModelLstmController extends Controller
 
     public function __construct()
     {
-        $this->middleware(['auth', 'admin']);
+        $this->middleware(['auth', 'admin'])
+            ->except(['internalTrainCallback']); // <--- BEBASKAN CALLBACK
     }
 
     public function index()
@@ -107,7 +110,8 @@ class ModelLstmController extends Controller
     }
 
     /**
-     * (Opsional) jalankan script .py langsung dengan Process.
+     * Jalankan script .py langsung dengan Process.
+     * Setelah sukses, simpan info ke tabel model_info.
      */
     public function train()
     {
@@ -139,6 +143,22 @@ class ModelLstmController extends Controller
                 return back()->with('error', 'Training error: ' . substr($process->getErrorOutput(), 0, 500));
             }
 
+            // Catat info model ke database
+            ModelInfo::create([
+                'dataset_id'      => null,
+                'model_name'      => 'LSTM Local Training',
+                'framework'       => 'keras-tensorflow',
+                'status'          => 'trained',
+                'train_accuracy'  => null,
+                'val_accuracy'    => null,
+                'train_loss'      => null,
+                'val_loss'        => null,
+                'epochs'          => null,
+                'hyperparameters' => null,
+                'model_path'      => $this->modelsDir,
+                'trained_at'      => Carbon::now(),
+            ]);
+
             return back()->with('success', 'Training selesai. Output: ' . substr($process->getOutput(), 0, 500));
         } catch (\Throwable $e) {
             Log::error('Train exception: ' . $e->getMessage());
@@ -148,6 +168,7 @@ class ModelLstmController extends Controller
 
     /**
      * Trigger training via FastAPI (background).
+     * Di sini kita create record model_info dulu, kirim ID-nya ke FastAPI.
      */
     public function triggerTrain(Request $request)
     {
@@ -159,12 +180,37 @@ class ModelLstmController extends Controller
             'model_name_prefix' => 'nullable|string',
         ]);
 
+        $datasetId   = (int) $request->input('dataset_id');
+        $epochs      = (int) $request->input('epochs', 3);
+        $maxWords    = (int) $request->input('max_words', 20000);
+        $maxlen      = (int) $request->input('maxlen', 200);
+        $namePrefix  = $request->input('model_name_prefix', 'admin_run');
+
+        // 1) Buat nama model unik
+        $modelName = $namePrefix . '_' . now()->format('Ymd_His');
+
+        // 2) Buat record awal di model_info (status: queued/training)
+        $modelInfo = ModelInfo::create([
+            'dataset_id'      => $datasetId,
+            'model_name'      => $modelName,
+            'framework'       => 'keras-tensorflow',
+            'status'          => 'queued',
+            'epochs'          => $epochs,
+            'hyperparameters' => [
+                'max_words' => $maxWords,
+                'maxlen'    => $maxlen,
+            ],
+            'trained_at'      => null,
+        ]);
+
+        // 3) Payload ke FastAPI
         $payload = [
-            'dataset_id'        => (int) $request->input('dataset_id'),
-            'epochs'            => (int) $request->input('epochs', 3),
-            'max_words'         => (int) $request->input('max_words', 20000),
-            'maxlen'            => (int) $request->input('maxlen', 200),
-            'model_name_prefix' => $request->input('model_name_prefix', 'admin_run'),
+            'dataset_id'        => $datasetId,
+            'epochs'            => $epochs,
+            'max_words'         => $maxWords,
+            'maxlen'            => $maxlen,
+            'model_name_prefix' => $namePrefix,
+            'model_info_id'     => $modelInfo->id, // penting untuk callback update
         ];
 
         $fastapiUrl = rtrim(env('FASTAPI_URL', 'http://127.0.0.1:8001'), '/')
@@ -179,16 +225,79 @@ class ModelLstmController extends Controller
                 ->post($fastapiUrl, $payload);
 
             Log::info("FastAPI train request status=" . $resp->status(), [
-                'body' => $resp->body(),
+                'body'   => $resp->body(),
+                'url'    => $fastapiUrl,
+                'payload'=> $payload,
+            ]);
+
+            // Update status jadi "training" kalau request FastAPI tidak error
+            $modelInfo->update([
+                'status' => 'training',
             ]);
         } catch (\Illuminate\Http\Client\ConnectionException $e) {
             // dianggap sukses — fire and forget
             Log::warning("FastAPI background fire-and-forget: " . $e->getMessage());
+            $modelInfo->update([
+                'status' => 'training',
+            ]);
         } catch (\Exception $e) {
             Log::error("FastAPI train error: " . $e->getMessage());
+            $modelInfo->update([
+                'status' => 'failed',
+            ]);
             return back()->with('error', 'Failed contacting FastAPI: ' . $e->getMessage());
         }
 
         return back()->with('success', 'Training started (FastAPI background).');
+    }
+
+    /**
+     * Endpoint callback yang dipanggil FastAPI ketika training selesai.
+     * URL: POST /api/internal/train/callback
+     */
+    public function internalTrainCallback(Request $request)
+    {
+        // Simple security: cek token internal
+        $token = $request->header('X-INTERNAL-TOKEN');
+        if ($token !== env('INTERNAL_API_TOKEN', 'HAIKYU2025')) {
+            Log::warning('Invalid INTERNAL_API_TOKEN on callback');
+            return response()->json(['message' => 'Unauthorized'], 401);
+        }
+
+        $data = $request->validate([
+            'model_info_id'  => 'required|integer',
+            'status'         => 'required|string', // trained / failed
+            'train_accuracy' => 'nullable|numeric',
+            'val_accuracy'   => 'nullable|numeric',
+            'train_loss'     => 'nullable|numeric',
+            'val_loss'       => 'nullable|numeric',
+            'epochs'         => 'nullable|integer',
+            'model_path'     => 'nullable|string',
+        ]);
+
+        $modelInfo = ModelInfo::find($data['model_info_id']);
+        if (!$modelInfo) {
+            Log::error('ModelInfo not found on callback id=' . $data['model_info_id']);
+            return response()->json(['message' => 'ModelInfo not found'], 404);
+        }
+
+        $modelInfo->status         = $data['status'];
+        $modelInfo->train_accuracy = $data['train_accuracy'] ?? null;
+        $modelInfo->val_accuracy   = $data['val_accuracy'] ?? null;
+        $modelInfo->train_loss     = $data['train_loss'] ?? null;
+        $modelInfo->val_loss       = $data['val_loss'] ?? null;
+        $modelInfo->epochs         = $data['epochs'] ?? $modelInfo->epochs;
+        $modelInfo->model_path     = $data['model_path'] ?? $modelInfo->model_path;
+
+        if ($data['status'] === 'trained') {
+            $modelInfo->trained_at = Carbon::now();
+        }
+
+        $modelInfo->save();
+
+        return response()->json([
+            'message'    => 'Model info updated',
+            'model_info' => $modelInfo,
+        ]);
     }
 }
